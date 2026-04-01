@@ -1,14 +1,23 @@
 import { defineStore } from "pinia";
 import { apiFetch } from "../api/http";
 
+function readStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem("user") || "null");
+  } catch {
+    localStorage.removeItem("user");
+    return null;
+  }
+}
+
 export const useAuthStore = defineStore("auth", {
   state: () => ({
     token: localStorage.getItem("token") || "",
-    user: JSON.parse(localStorage.getItem("user") || "null")
+    user: readStoredUser()
   }),
   getters: {
-    isLogged: (s) => !!s.token,
-    role: (s) => s.user?.role || null
+    isLogged: (s) => !!s.token && !!s.user,
+    role: (s) => s.user?.role || null,
   },
   actions: {
     async login(email, password) {
@@ -18,8 +27,8 @@ export const useAuthStore = defineStore("auth", {
       localStorage.setItem("token", this.token);
       localStorage.setItem("user", JSON.stringify(this.user));
     },
-    async register(email, password, role) {
-      await apiFetch("/auth/register", { method: "POST", body: { email, password, role } });
+    async register(email, password) {
+      await apiFetch("/auth/register", { method: "POST", body: { email, password } });
     },
     logout() {
       this.token = "";

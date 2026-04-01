@@ -12,6 +12,56 @@ router.get("/", async (req, res) => {
   res.json(events);
 });
 
+// Events created by the authenticated user
+router.get(
+  "/mine",
+  requireAuth,
+  async (req, res) => {
+    const events = await Event.find({ organizerId: req.user.id }).sort({ date: 1 }).lean();
+    res.json(events);
+  }
+);
+
+// Events where the authenticated user is registered
+router.get(
+  "/registered",
+  requireAuth,
+  async (req, res) => {
+    const events = await Event.find({ participants: req.user.id }).sort({ date: 1 }).lean();
+    res.json(events);
+  }
+);
+
+// Participants of one event (ADMIN or owner ORGANIZER)
+router.get(
+  "/:id/participants",
+  requireAuth,
+  param("id").isMongoId(),
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    const event = await Event.findById(req.params.id)
+      .populate("participants", "email role firstName lastName")
+      .lean();
+
+    if (!event) return res.status(404).json({ message: "Event not found" });
+
+    const isAdmin = req.user.role === "ADMIN";
+    const isOwner = event.organizerId.toString() === req.user.id;
+    const isOwnerOrganizer = req.user.role === "ORGANIZER" && isOwner;
+
+    if (!isAdmin && !isOwnerOrganizer) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    res.json({
+      eventId: event._id,
+      participants: event.participants
+    });
+  }
+);
+
 // Create (ORGANIZER or ADMIN)
 router.post(
   "/",
@@ -91,6 +141,9 @@ router.delete(
   allowRoles("ADMIN", "ORGANIZER"),
   param("id").isMongoId(),
   async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ message: "Event not found" });
 

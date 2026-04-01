@@ -62,6 +62,27 @@ export const useEventsStore = defineStore("events", {
       if (index !== -1) this.items[index] = updated;
 
       return updated;
+    },
+
+    async fetchMyEvents() {
+      const auth = useAuthStore();
+      return await apiFetch("/events/mine", {
+        token: auth.token
+      });
+    },
+
+    async fetchRegisteredEvents() {
+      const auth = useAuthStore();
+      return await apiFetch("/events/registered", {
+        token: auth.token
+      });
+    },
+
+    async fetchParticipants(eventId) {
+      const auth = useAuthStore();
+      return await apiFetch(`/events/${eventId}/participants`, {
+        token: auth.token
+      });
     }
   }
 });

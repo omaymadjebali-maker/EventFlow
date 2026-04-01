@@ -3,6 +3,8 @@ import cors from "cors";
 
 import authRoutes from "./routes/auth.routes.js";
 import eventRoutes from "./routes/event.routes.js";
+import meRoutes from "./routes/me.routes.js";
+import userRoutes from "./routes/user.routes.js";
 
 export function createApp() {
   const app = express();
@@ -14,13 +16,15 @@ export function createApp() {
 
   app.use("/api/auth", authRoutes);
   app.use("/api/events", eventRoutes);
+  app.use("/api/me", meRoutes);
+  app.use("/api/users", userRoutes);
 
   app.use((req, res) => res.status(404).json({ message: "Not found" }));
 
   app.use((err, req, res, next) => {
     console.error(err);
     res.status(err.status || 500).json({
-      message: err.message || "Server error"
+      message: err.message || "Server error",
     });
   });
 

@@ -1,8 +1,13 @@
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE || "http://localhost:5000/api";
 
 export async function apiFetch(path, { token, method = "GET", body } = {}) {
-  const headers = { "Content-Type": "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  const headers = {
+    "Content-Type": "application/json"
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
   const res = await fetch(`${API_BASE}${path}`, {
     method,
@@ -17,5 +22,6 @@ export async function apiFetch(path, { token, method = "GET", body } = {}) {
     const msg = data?.message || (data?.errors?.[0]?.msg ?? "Request failed");
     throw new Error(msg);
   }
+
   return data;
 }

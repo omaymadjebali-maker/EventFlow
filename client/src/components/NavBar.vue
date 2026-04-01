@@ -25,6 +25,10 @@
           <router-link v-if="auth.isLogged" to="/my-events" class="nav-link">
             Mes événements
           </router-link>
+          <router-link v-if="auth.token && auth.user?.role === 'ADMIN'"to="/admin">
+            Admin
+          </router-link>
+
         </nav>
       </div>
 

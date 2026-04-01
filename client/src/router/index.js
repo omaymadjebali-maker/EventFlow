@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "../stores/auth";
+import AdminDashboard from "../pages/AdminDashboard.vue";
 
 import Login from "../pages/Login.vue";
 import Register from "../pages/Register.vue";
@@ -35,7 +36,13 @@ const routes = [
   name: "my-events",
   component: MyEvents,
   meta: { requiresAuth: true }
+},{
+  path: "/admin",
+  name: "admin-dashboard",
+  component: AdminDashboard,
+  meta: { requiresAuth: true, roles: ["ADMIN"] },
 }
+
 ];
 
 const router = createRouter({ history: createWebHistory(), routes });

@@ -25,6 +25,10 @@
           <router-link v-if="auth.isLogged" to="/my-events" class="nav-link">
             Mes événements
           </router-link>
+
+          <router-link v-if="isAdmin" to="/admin" class="nav-link">
+            Admin
+          </router-link>
         </nav>
       </div>
 
@@ -105,6 +109,15 @@
           >
             Mes événements
           </router-link>
+
+          <router-link
+            v-if="isAdmin"
+            to="/admin"
+            class="mobile-link"
+            @click="closeMenu"
+          >
+            Admin
+          </router-link>
         </nav>
 
         <div class="mobile-footer">
@@ -153,6 +166,11 @@ const menuOpen = ref(false);
 const canCreate = computed(() => {
   const role = auth.user?.role || auth.role;
   return ["ADMIN", "ORGANIZER", "admin", "organizer"].includes(role);
+});
+
+const isAdmin = computed(() => {
+  const role = auth.user?.role || auth.role;
+  return ["ADMIN", "admin"].includes(role);
 });
 
 const userInitial = computed(() => {

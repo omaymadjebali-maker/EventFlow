@@ -7,6 +7,7 @@ import Dashboard from "../pages/Dashboard.vue";
 import CreateEvent from "../pages/CreateEvent.vue";
 const EditEvent = () => import("../pages/EditEvent.vue");
 const MyEvents = () => import("../pages/MyEvents.vue");
+const AdminDashboard = () => import("../pages/AdminDashboard.vue");
 
 const routes = [
   { path: "/", name: "dashboard", component: Dashboard },
@@ -19,23 +20,29 @@ const routes = [
     meta: { requiresAuth: true, roles: ["ADMIN", "ORGANIZER"] }
   },
   {
-  path: "/events/:id/edit",
-  name: "edit-event",
-  component: EditEvent,
-  meta: { requiresAuth: true, roles: ["ADMIN", "ORGANIZER"] }
+    path: "/events/:id/edit",
+    name: "edit-event",
+    component: EditEvent,
+    meta: { requiresAuth: true, roles: ["ADMIN", "ORGANIZER"] }
   },
   {
-  path: "/profile",
-  name: "profile",
-  component: () => import("../pages/Profile.vue"),
-  meta: { requiresAuth: true }
+    path: "/profile",
+    name: "profile",
+    component: () => import("../pages/Profile.vue"),
+    meta: { requiresAuth: true }
   },
   {
-  path: "/my-events",
-  name: "my-events",
-  component: MyEvents,
-  meta: { requiresAuth: true }
-}
+    path: "/my-events",
+    name: "my-events",
+    component: MyEvents,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: "/admin",
+    name: "admin-dashboard",
+    component: AdminDashboard,
+    meta: { requiresAuth: true, roles: ["ADMIN"] }
+  }
 ];
 
 const router = createRouter({ history: createWebHistory(), routes });

@@ -165,6 +165,132 @@
             </div>
           </div>
 
+          <div class="activity-section gdpr-section">
+            <div class="activity-head">
+              <div>
+                <p class="eyebrow">RGPD</p>
+                <h3>Données personnelles</h3>
+              </div>
+            </div>
+
+            <p class="gdpr-intro">
+              Depuis cet espace, vous pouvez exporter vos données, consulter l’historique de vos
+              consentements et déclencher les actions sensibles liées à votre compte.
+            </p>
+
+            <div v-if="gdprMessage" class="gdpr-alert gdpr-alert-success">
+              {{ gdprMessage }}
+            </div>
+
+            <div v-if="gdprError" class="gdpr-alert gdpr-alert-error">
+              {{ gdprError }}
+            </div>
+
+            <div class="gdpr-actions-grid">
+              <div class="gdpr-card">
+                <div class="gdpr-card-head">
+                  <div>
+                    <span class="info-label">Export</span>
+                    <strong>Exporter mes données</strong>
+                  </div>
+                  <button
+                    class="btn btn-secondary btn-compact"
+                    :disabled="exportLoading"
+                    @click="exportPersonalData"
+                  >
+                    {{ exportLoading ? "Export..." : "Exporter" }}
+                  </button>
+                </div>
+
+                <p class="gdpr-help">
+                  Récupère les informations de votre compte, vos événements créés et vos
+                  inscriptions.
+                </p>
+
+                <div v-if="exportData" class="export-panel">
+                  <div class="export-panel-head">
+                    <strong>Export prêt</strong>
+                    <button class="btn btn-primary btn-compact" @click="downloadExport">
+                      Télécharger le JSON
+                    </button>
+                  </div>
+                  <pre class="export-preview">{{ formattedExportData }}</pre>
+                </div>
+              </div>
+
+              <div class="gdpr-card">
+                <div class="gdpr-card-head">
+                  <div>
+                    <span class="info-label">Journal</span>
+                    <strong>Consent logs</strong>
+                  </div>
+                  <button
+                    class="btn btn-secondary btn-compact"
+                    :disabled="consentLogsLoading"
+                    @click="loadConsentLogs"
+                  >
+                    {{ consentLogsLoading ? "Chargement..." : "Actualiser" }}
+                  </button>
+                </div>
+
+                <p class="gdpr-help">
+                  Historique des actions RGPD enregistrées pour votre compte.
+                </p>
+
+                <div v-if="consentLogsLoading" class="activity-state">
+                  Chargement des consent logs...
+                </div>
+
+                <div v-else-if="consentLogsError" class="activity-state error">
+                  {{ consentLogsError }}
+                </div>
+
+                <div v-else-if="consentLogs.length === 0" class="activity-state">
+                  Aucun consent log disponible pour le moment.
+                </div>
+
+                <div v-else class="logs-list">
+                  <article v-for="log in consentLogs" :key="log._id || `${log.action}-${log.timestamp}`" class="log-card">
+                    <div class="log-card-head">
+                      <strong>{{ consentActionLabel(log.action) }}</strong>
+                      <span class="log-badge">{{ consentActionStatus(log.action) }}</span>
+                    </div>
+                    <p>{{ formatDate(log.timestamp) }}</p>
+                  </article>
+                </div>
+              </div>
+            </div>
+
+            <div class="gdpr-danger-zone">
+              <div class="gdpr-danger-copy">
+                <span class="info-label">Actions sensibles</span>
+                <strong>Retrait du consentement et anonymisation</strong>
+                <p>
+                  Ces actions sont sensibles. L’anonymisation est irréversible et entraîne la
+                  perte d’accès au compte.
+                </p>
+              </div>
+
+              <div class="gdpr-danger-actions">
+                <button
+                  class="btn btn-warning"
+                  :disabled="withdrawLoading || anonymizeLoading"
+                  @click="withdrawConsent"
+                >
+                  {{ withdrawLoading ? "Traitement..." : "Retirer mon consentement" }}
+                </button>
+
+                <button
+                  class="btn btn-danger"
+                  :disabled="withdrawLoading || anonymizeLoading"
+                  @click="anonymizeAccount"
+                >
+                  {{ anonymizeLoading ? "Anonymisation..." : "Anonymiser mon compte" }}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="actions">
             <router-link class="btn btn-secondary" :to="{ name: 'dashboard' }">
               Retour au dashboard
@@ -181,15 +307,27 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import { apiFetch } from "../api/http";
 import { useAuthStore } from "../stores/auth";
 import { useEventsStore } from "../stores/events";
 
+const router = useRouter();
 const auth = useAuthStore();
 const events = useEventsStore();
 const createdEvents = ref([]);
 const registeredEvents = ref([]);
 const activityLoading = ref(false);
 const activityError = ref("");
+const exportLoading = ref(false);
+const withdrawLoading = ref(false);
+const anonymizeLoading = ref(false);
+const exportData = ref(null);
+const consentLogs = ref([]);
+const consentLogsLoading = ref(false);
+const consentLogsError = ref("");
+const gdprMessage = ref("");
+const gdprError = ref("");
 
 const userInitial = computed(() => {
   const email = auth.user?.email || "";
@@ -212,6 +350,10 @@ const roleDescription = computed(() => {
   return "Le rôle de ce compte n’est pas encore défini.";
 });
 
+const formattedExportData = computed(() => {
+  return exportData.value ? JSON.stringify(exportData.value, null, 2) : "";
+});
+
 function formatDate(d) {
   return new Date(d).toLocaleString("fr-FR", {
     day: "2-digit",
@@ -220,6 +362,136 @@ function formatDate(d) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function resetGdprFeedback() {
+  gdprMessage.value = "";
+  gdprError.value = "";
+}
+
+function consentActionLabel(action) {
+  const labels = {
+    consent_given: "Consentement donné",
+    consent_withdrawn: "Consentement retiré",
+    data_accessed: "Données consultées",
+    data_deleted: "Données supprimées",
+    data_anonymized: "Compte anonymisé",
+    profile_updated: "Profil mis à jour",
+  };
+
+  return labels[action] || action || "Action inconnue";
+}
+
+function consentActionStatus(action) {
+  if (action === "consent_withdrawn") return "Retiré";
+  if (action === "data_anonymized") return "Irréversible";
+  if (action === "consent_given") return "Actif";
+  return "Historique";
+}
+
+async function disconnectAfterSensitiveAction(message) {
+  gdprMessage.value = message;
+  setTimeout(() => {
+    auth.logout();
+    router.push({ name: "login" });
+  }, 1200);
+}
+
+async function loadConsentLogs() {
+  consentLogsLoading.value = true;
+  consentLogsError.value = "";
+
+  try {
+    consentLogs.value = await apiFetch("/me/consent-logs", {
+      token: auth.token,
+    });
+  } catch (e) {
+    consentLogs.value = [];
+    consentLogsError.value = e.message || "Impossible de charger les consent logs.";
+  } finally {
+    consentLogsLoading.value = false;
+  }
+}
+
+async function exportPersonalData() {
+  exportLoading.value = true;
+  resetGdprFeedback();
+
+  try {
+    exportData.value = await apiFetch("/me/export", {
+      token: auth.token,
+    });
+    gdprMessage.value = "Vos données ont été exportées avec succès.";
+  } catch (e) {
+    exportData.value = null;
+    gdprError.value = e.message || "Impossible d'exporter vos données.";
+  } finally {
+    exportLoading.value = false;
+  }
+}
+
+function downloadExport() {
+  if (!exportData.value) return;
+
+  const blob = new Blob([JSON.stringify(exportData.value, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "eventflow-personal-data.json";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+async function withdrawConsent() {
+  const confirmed = window.confirm(
+    "Confirmer le retrait du consentement ? Cette action anonymise votre compte et vous déconnectera."
+  );
+  if (!confirmed) return;
+
+  withdrawLoading.value = true;
+  resetGdprFeedback();
+
+  try {
+    const data = await apiFetch("/me/withdraw-consent", {
+      token: auth.token,
+      method: "POST",
+    });
+    await disconnectAfterSensitiveAction(
+      data?.message || "Consentement retiré. Votre compte va être déconnecté."
+    );
+  } catch (e) {
+    gdprError.value = e.message || "Impossible de retirer votre consentement.";
+  } finally {
+    withdrawLoading.value = false;
+  }
+}
+
+async function anonymizeAccount() {
+  const confirmed = window.confirm(
+    "Anonymiser votre compte ? Cette action est irréversible et vous serez déconnecté automatiquement."
+  );
+  if (!confirmed) return;
+
+  anonymizeLoading.value = true;
+  resetGdprFeedback();
+
+  try {
+    const data = await apiFetch("/me/anonymize", {
+      token: auth.token,
+      method: "POST",
+    });
+    await disconnectAfterSensitiveAction(
+      data?.message || "Compte anonymisé avec succès. Déconnexion en cours."
+    );
+  } catch (e) {
+    gdprError.value = e.message || "Impossible d'anonymiser votre compte.";
+  } finally {
+    anonymizeLoading.value = false;
+  }
 }
 
 async function loadActivity() {
@@ -254,6 +526,7 @@ async function loadActivity() {
 
 onMounted(() => {
   loadActivity();
+  loadConsentLogs();
 });
 </script>
 
@@ -692,6 +965,166 @@ onMounted(() => {
   color: #b91c1c;
 }
 
+.gdpr-section {
+  margin-top: 24px;
+}
+
+.gdpr-intro {
+  margin: 0 0 16px;
+  color: #475569;
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+.gdpr-alert {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.gdpr-alert-success {
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.gdpr-alert-error {
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.gdpr-actions-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.gdpr-card {
+  padding: 18px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid #e8eef6;
+}
+
+.gdpr-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gdpr-card-head strong,
+.gdpr-danger-copy strong {
+  display: block;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.gdpr-help {
+  margin: 12px 0 0;
+  color: #64748b;
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.export-panel {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 18px;
+  background: #f8fbff;
+  border: 1px solid #dbe8f8;
+}
+
+.export-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.export-preview {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 14px;
+  border-radius: 14px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.logs-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.log-card {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #f8fbff;
+  border: 1px solid #e4edf7;
+}
+
+.log-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.log-card-head strong {
+  color: #0f172a;
+  font-size: 0.92rem;
+}
+
+.log-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.log-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #e8f0ff;
+  color: #1d4ed8;
+  font-size: 0.74rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.gdpr-danger-zone {
+  margin-top: 16px;
+  padding: 18px;
+  border-radius: 22px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+
+.gdpr-danger-copy p {
+  margin: 10px 0 0;
+  color: #9a3412;
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+.gdpr-danger-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
 .actions {
   display: flex;
   gap: 12px;
@@ -736,6 +1169,32 @@ onMounted(() => {
   filter: brightness(1.03);
 }
 
+.btn-danger {
+  border: none;
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(220, 38, 38, 0.2);
+}
+
+.btn-warning {
+  border: none;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(245, 158, 11, 0.2);
+}
+
+.btn-compact {
+  min-height: 42px;
+  padding: 0 14px;
+  font-size: 0.85rem;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+}
+
 @media (max-width: 980px) {
   .profile-shell {
     grid-template-columns: 1fr;
@@ -758,6 +1217,14 @@ onMounted(() => {
   .activity-card-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .gdpr-card-head,
+  .export-panel-head,
+  .log-card-head,
+  .gdpr-danger-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .btn {

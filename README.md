@@ -61,7 +61,7 @@ Variables disponibles dans `server/.env.example` :
 
 ```env
 PORT=5000
-MONGO_URI=mongodb://mongo:27017/eventflow
+MONGO_URI=mongodb+srv://<username>:<password>@<cluster-url>/eventflow?retryWrites=true&w=majority
 JWT_SECRET=replace_with_a_strong_secret
 JWT_EXPIRES_IN=7d
 CORS_ORIGIN=http://localhost:5173
@@ -89,7 +89,7 @@ cp .env.example .env
 Variable disponible dans `client/.env.example` :
 
 ```env
-VITE_API_URL=http://localhost:5000/api
+VITE_API_BASE_URL=http://localhost:5000/api
 ```
 
 ## Lancement en developpement
